@@ -1,143 +1,139 @@
-% Zeitbereich 
-% ---------------------------------- 
+import streamlit as st
+import pandas as pd
+import random
 
-fa = 8000; % Abtastfrequenz 
-fn = fa/2; % Nyquistfrequenz 
-N = 10189; % gewünschte FFT-Länge (N=2^x, sonst wird der DFT-Algorithmus verwendet!) 
-df = fa/N; % Frequenzauflösung 
-% Erzeugung eines Datensatzes mit N Abtastwerten 
-% ---------------------------------------------- 
-t = 0 : 1/fa : (N-1)/fa; % x-Vektor 
-% Frequenzvorgabe in Hz als ganzzahlig Vielfaches der Frequenzauflösung der DFT/FFT: 
-f1 = df*100; % bei fa = 8000 Hz und N = 1024 beträgt df = 7,8125 Hz und 
-% f1 damit 781,25 Hz 
- f1 = 784; 
- f1 = df; 
- phase = pi/2; 
-fig=1;
-a1 = 1; % Amplitudenvorgabe 
-y = a1*sin(2*pi*f1*t); % y-Vektor 
-y = u_a_mod; 
-% Graphische Darstellung 
-% ---------------------- 
-% max. Amplitude zur Skalierung der graphischen Darstellung feststellen: 
-max_y = max(abs(y))*1.1; 
-fig = figure(1); 
-plot(y) 
-axis([0 N -max_y max_y]) 
-title('Datensatz') 
-ylabel('Amplitude') 
-xlabel('N Stützstellen') 
-grid 
+# --------------------------------
+# Grundeinstellungen
+# --------------------------------
+st.set_page_config(page_title="Familien-Essensplaner", layout="centered")
+st.title("🍽 Familien-Essensplaner")
+st.caption("Ein Klick zum Wochenplan inkl. Einkaufsliste")
 
+# --------------------------------
+# Google Sheet
+# --------------------------------
+SHEET_ID = "1X9g21WLcgmcqsdrNSCCoUm4scz1-dLp2Uba13SVEZt4"
+CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
 
-% Frequenzbereich 
-% ---------------------------------- 
+# --------------------------------
+# Daten laden
+# --------------------------------
+@st.cache_data
+def lade_gerichte():
+    df = pd.read_csv(CSV_URL)
+    gerichte = {}
 
-% Berechnung der FFT 
-% ------------------ 
-H = fft(y, N); 
-% Berechnung des Amplitudengangs aus dem komplexen Frequenzvektor H: 
-amplH = abs(H); 
-% Amplitudenskalierung (Normierung auf N) und verschieben der Elemente des 
-% Amplitudenvektors, so dass die Darstellung des Amplitudengangs von -fn...0...fn 
-% erfolgen kann: 
-amplitudengang = fftshift(amplH/N); 
-% Graphische Darstellung 
-% ---------------------- 
-% Frequenzvektoren (werden bei der graphischen Darstellung benötigt): 
-x_fn = 0 : df : fn-df; 
-x_fa = 0 : df : fa-df; 
-% max. Amplitude zur Skalierung der graphischen Darstellung feststellen: 
-%a = max([a1, a2, a3, a4, a5]); % wird später benötigt 
-a = a1; 
-fig = figure(); 
-stem(x_fa-fn, amplitudengang, 'b.-') 
-axis([-fn fn 0 a/2*1.1]) 
-title('Amplitudengang') 
-ylabel('Amplitude') 
-xlabel(['Auflösung: ',num2str(df),' Hz Frequenz in Hz']) 
-grid 
+    for _, row in df.iterrows():
+        name = row["Gericht"]
+        if name not in gerichte:
+            gerichte[name] = {
+                "kategorie": row["Kategorie"],
+                "zutaten": {}
+            }
+        gerichte[name]["zutaten"][row["Zutat"]] = (
+            int(row["Menge"]),
+            row["Einheit"]
+        )
+    return gerichte
 
-% Ausgabe in dB % ------------------ 
-fig = figure(); 
-plot(x_fa-fn, 20*log10(amplitudengang)) 
-%axis([-fn fn -100 20*log10(a/2)+3]) 
-axis([-fn fn -100 3]) 
-title('Amplitudengang') 
-ylabel('Amplitude in dB') 
-xlabel(['Auflösung: ',num2str(df),' Hz Frequenz in Hz']) 
-grid 
+try:
+    gerichte = lade_gerichte()
+except Exception as e:
+    st.error("Fehler beim Laden der Gerichte")
+    st.stop()
 
-% Darstellung des interessierenden Frequenzbereichs des 
-% Amplitudengangs (0...fn) und 
-% daran angepasste Amplitudenskalierung (Normierung auf N/2): 
-amplitudengang = [amplH(1)/N amplH(2:N/2)/(N/2)]; % DC-Bin auf N normieren! 
-fig = figure(); 
-stem(x_fn, amplitudengang, 'b.-') 
-axis([0 fn 0 a*1.1]) 
-title('Amplitudengang') 
-ylabel('Amplitude') 
-xlabel(['Auflösung: ',num2str(df),' Hz Frequenz in Hz']) 
-grid 
+gericht_namen = sorted(gerichte.keys())
 
-% Ausgabe in dB 
-% ------------------ 
-fig = figure(); 
-plot(x_fn, 20*log10(amplitudengang)) 
-axis([0 fn -100 20*log10(a)+3]) 
-title('Amplitudengang') 
-ylabel('Amplitude in dB') 
-xlabel(['Auflösung: ',num2str(df),' Hz Frequenz in Hz']) 
-grid 
+# --------------------------------
+# Wochentage
+# --------------------------------
+wochentage = [
+    "Montag", "Dienstag", "Mittwoch",
+    "Donnerstag", "Freitag", "Samstag", "Sonntag"
+]
 
+# --------------------------------
+# UI – Vorgaben
+# --------------------------------
+st.subheader("📌 Feste Tage (optional)")
+st.write("Leer lassen = Zufall")
 
-% Fensterfunktion 
-% ---------------------- 
+vorgaben = {}
+for tag in wochentage:
+    auswahl = st.selectbox(
+        tag,
+        options=["(Zufall)"] + gericht_namen,
+        key=tag
+    )
+    if auswahl != "(Zufall)":
+        vorgaben[tag] = auswahl
 
-% Anhang an die bereits erfolgte Untersuchung 
-% ------------------------------------------- 
-win = hann(N)'; 
-%y_win = y.*win; % Fensterung ohne Amplitudenkorrektur 
-y_win = y.*win*N/sum(win); % Fensterung mit Amplitudenkorrektur 
-max_y = max(abs(y_win))*1.1; 
+# --------------------------------
+# Logik: Wochenplan
+# --------------------------------
+def erstelle_wochenplan(gerichte, vorgaben):
+    plan = {}
+    freie_gerichte = [
+        g for g in gerichte if g not in vorgaben.values()
+    ]
+    random.shuffle(freie_gerichte)
 
-fig = figure(fig+1); 
-plot(y_win) 
-axis([0 N -max_y max_y]) 
-title('Datensatz nach Fensterung mit Hann-Fenster') 
-ylabel('Amplitude') 
-xlabel('N Stützstellen') 
-grid 
+    for i, tag in enumerate(wochentage):
+        if tag in vorgaben:
+            plan[tag] = vorgaben[tag]
+            continue
 
-% Berechnung der FFT 
-% ------------------ 
-H = fft(y_win, N); 
-% Berechnung des Amplitudengangs aus dem komplexen Frequenzvektor H: 
-amplH = abs(H); 
-% Amplitudenskalierung (Normierung auf N) und verschieben der Elemente des 
-% Amplitudenvektors, so dass die Darstellung des Amplitudengangs von -fn...0...fn 
-% erfolgen kann: 
-amplitudengang = fftshift(amplH/N); 
+        for gericht in freie_gerichte:
+            kategorie = gerichte[gericht]["kategorie"]
 
-% Graphische Darstellung 
-% ---------------------- 
-fig = figure(); 
-stem(x_fa-fn, amplitudengang, 'b.-') 
-axis([-fn fn 0 a/2*1.1]) 
-title('Amplitudengang nach Fensterung') 
-ylabel('Amplitude') 
-xlabel(['Auflösung: ',num2str(df),' Hz Frequenz in Hz']) 
-grid 
+            if i > 0:
+                vorher = plan[wochentage[i - 1]]
+                if vorher == gericht:
+                    continue
+                if gerichte[vorher]["kategorie"] == kategorie:
+                    continue
 
-% Ausgabe in dB 
-% ------------------ 
-fig = figure(); 
-plot(x_fa-fn, 20*log10(amplitudengang)) 
-%axis([-fn fn -100 20*log10(a/2)+3]) 
-axis([-fn fn -100 3]) 
-title('Amplitudengang nach Fensterung') 
-ylabel('Amplitude in dB') 
-xlabel(['Auflösung: ',num2str(df),' Hz Frequenz in Hz']) 
-grid 
- 
+            if kategorie == "Wochenende" and tag not in ["Samstag", "Sonntag"]:
+                continue
+
+            plan[tag] = gericht
+            freie_gerichte.remove(gericht)
+            break
+        else:
+            raise RuntimeError("Zu viele Einschränkungen – kein gültiger Plan möglich.")
+
+    return plan
+
+# --------------------------------
+# Einkaufsliste
+# --------------------------------
+def erstelle_einkaufsliste(plan):
+    einkauf = {}
+    for gericht in plan.values():
+        for zutat, (menge, einheit) in gerichte[gericht]["zutaten"].items():
+            if zutat not in einkauf:
+                einkauf[zutat] = [0, einheit]
+            einkauf[zutat][0] += menge
+    return einkauf
+
+# --------------------------------
+# Button
+# --------------------------------
+st.divider()
+
+if st.button("🧠 Wochenplan erstellen", use_container_width=True):
+    try:
+        plan = erstelle_wochenplan(gerichte, vorgaben)
+        einkauf = erstelle_einkaufsliste(plan)
+
+        st.subheader("📅 Wochenplan")
+        for tag in wochentage:
+            g = plan[tag]
+            st.write(f"**{tag}:** {g} ({gerichte[g]['kategorie']})")
+
+        st.subheader("🛒 Einkaufsliste")
+        for zutat, (menge, einheit) in einkauf.items():
+            st.write(f"- {zutat}: {menge} {einheit}")
+
+    except Exception as e:
+        st.error(str(e))
