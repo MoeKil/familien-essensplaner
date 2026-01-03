@@ -16,23 +16,30 @@ SHEET_URL = "https://docs.google.com/spreadsheets/d/1X9g21WLcgmcqsdrNSCCoUm4scz1
 # -----------------------------
 @st.cache_data
 def lade_gerichte():
-    df = pd.read_csv(SHEET_URL, encoding="utf-8-sig")
+    try:
+        df = pd.read_csv(SHEET_URL, encoding="utf-8-sig")
+    except Exception as e:
+        st.error(f"Fehler beim Laden des Sheets: {e}")
+        return {}
+
     gerichte = {}
 
     # Prüfen, ob die notwendigen Spalten vorhanden sind
-    if not set(["Gericht","Kategorie","Zutat","Menge","Einheit"]).issubset(df.columns):
-        st.error("Google Sheet muss die Spalten: Gericht, Kategorie, Zutat, Menge, Einheit enthalten!")
+    required_columns = ["Gericht","Kategorie","Zutat","Menge","Einheit"]
+    if not set(required_columns).issubset(df.columns):
+        st.error(f"Google Sheet muss die Spalten enthalten: {required_columns}")
         return {}
 
+    # Gerichte aus Sheet zusammenbauen
     for _, row in df.iterrows():
         name = row['Gericht']
         kategorie = row['Kategorie']
-        wochenende = row.get('Wochenende', False)  # optional Spalte für Wochenende
+        wochenende = row.get('Wochenende', False)  # optional
 
-        # Zutaten-Dictionary aufbauen
+        # Zutaten-Dict
         zutaten_dict = {row['Zutat']: (row['Menge'], row['Einheit'])}
 
-        # Falls Gericht schon existiert (mehrere Zeilen pro Gericht), zusammenführen
+        # Mehrere Zeilen pro Gericht zusammenführen
         if name in gerichte:
             gerichte[name]['zutaten'].update(zutaten_dict)
         else:
@@ -128,11 +135,9 @@ st.title("👨‍👩‍👧‍👦 Familien-Essensplaner")
 if not gerichte:
     st.warning("Keine Gerichte geladen. Bitte Google Sheet prüfen.")
 else:
-    # Dropdown Auswahl: Zufall, Vegetarisch, feste Gerichte
-    option = st.selectbox(
-        "Gericht auswählen",
-        ["Zufall", "Vegetarisch"] + list(gerichte.keys())
-    )
+    # Dropdown: immer mindestens "Zufall" + "Vegetarisch"
+    options = ["Zufall", "Vegetarisch"] + list(gerichte.keys())
+    option = st.selectbox("Gericht auswählen", options)
 
     # Verhalten je nach Auswahl
     if option == "Zufall":
