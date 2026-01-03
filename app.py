@@ -1,5 +1,5 @@
 # -----------------------------
-# Familien-Essensplaner mit Streamlit
+# Familien-Essensplaner Streamlit App
 # -----------------------------
 import streamlit as st
 import pandas as pd
@@ -7,7 +7,7 @@ import random
 import requests
 
 # -----------------------------
-# Google Sheet URL (CSV Export)
+# Google Sheet CSV
 # -----------------------------
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1X9g21WLcgmcqsdrNSCCoUm4scz1-dLp2Uba13SVEZt4/export?format=csv"
 
@@ -19,7 +19,7 @@ def lade_gerichte():
     df = pd.read_csv(SHEET_URL, encoding="utf-8-sig")
     gerichte = {}
 
-    # Prüfen, welche Spalten vorhanden sind
+    # Prüfen, ob die notwendigen Spalten vorhanden sind
     if not set(["Gericht","Kategorie","Zutat","Menge","Einheit"]).issubset(df.columns):
         st.error("Google Sheet muss die Spalten: Gericht, Kategorie, Zutat, Menge, Einheit enthalten!")
         return {}
@@ -29,10 +29,10 @@ def lade_gerichte():
         kategorie = row['Kategorie']
         wochenende = row.get('Wochenende', False)  # optional Spalte für Wochenende
 
-        # Zutaten-Dict aufbauen
+        # Zutaten-Dictionary aufbauen
         zutaten_dict = {row['Zutat']: (row['Menge'], row['Einheit'])}
 
-        # Falls Gericht schon existiert (mehrere Zutaten-Zeilen), zusammenführen
+        # Falls Gericht schon existiert (mehrere Zeilen pro Gericht), zusammenführen
         if name in gerichte:
             gerichte[name]['zutaten'].update(zutaten_dict)
         else:
@@ -128,13 +128,13 @@ st.title("👨‍👩‍👧‍👦 Familien-Essensplaner")
 if not gerichte:
     st.warning("Keine Gerichte geladen. Bitte Google Sheet prüfen.")
 else:
-    # Dropdown für Auswahl
+    # Dropdown Auswahl: Zufall, Vegetarisch, feste Gerichte
     option = st.selectbox(
         "Gericht auswählen",
         ["Zufall", "Vegetarisch"] + list(gerichte.keys())
     )
 
-    # Auswahl auswerten
+    # Verhalten je nach Auswahl
     if option == "Zufall":
         gericht = random.choice(list(gerichte.keys()))
         st.write(f"**Ausgewähltes Gericht:** {gericht}")
